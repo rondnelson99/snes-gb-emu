@@ -1,0 +1,5 @@
+[objects]
+obj/init.o
+obj/render.o
+obj/timing.o
+obj/players.o
