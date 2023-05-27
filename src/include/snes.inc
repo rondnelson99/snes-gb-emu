@@ -388,10 +388,10 @@ DMA_0011     = $03  ; For HDMA to scroll positions and mode 7 matrices
 DMA_0123     = $04  ; For HDMA to window registers
 DMA_0101     = $05  ; Not sure how this would be useful for HDMA
 DMA_FORWARD  = $00
-DMA_CONST    = $08
-DMA_BACKWARD = $10
-DMA_INDIRECT = $40
-DMA_READPPU  = $80
+DMA_CONST    = %00001000
+DMA_BACKWARD = %00010000
+DMA_INDIRECT = %01000000
+DMA_READPPU  = %10000000
 
 DMAPPUREG   = $4301
 DMAADDR     = $4302

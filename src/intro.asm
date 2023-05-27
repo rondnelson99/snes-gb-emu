@@ -109,8 +109,49 @@ ResetFastROM:
     lda #$01
     sta MEMSEL
 
+    ; DMA The VRAM image from ROM to WRAM
+
+    ; set the DMA registers
+    ; source address
+    lda #BANK(VRAMImage)
+    sta.w DMAADDRBANK
+    ldx #VRAMImage
+    stx.w DMAADDR
+    ; dest address
+    lda #<WMDATA
+    sta.w DMAPPUREG
+    ldx #$8000
+    stx.w WMADDL
+    lda #1 ; bank
+    sta.w WMADDH
+
+    ; length
+    ldx #VRAMImageEnd - VRAMImage
+    stx.w DMALEN
+    ; other properties
+    stz.w DMAMODE ; default properties
+
+    ; finally, start the DMA transfer
+    lda #$01 ; Channel 0
+    sta.w COPYSTART
 
 
 
 
+
+
+
+
+
+
+
+
+
+
+.ENDS
+
+.SECTION "Gameboy VRAM image", BASE $80 SUPERFREE
+VRAMImage:
+    .INCBIN "res/vram.bin"
+VRAMImageEnd:
 .ENDS
