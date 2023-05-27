@@ -5,7 +5,7 @@
 PADVALUE := 0xFF
 
 # ROM name
-ROMNAME := boilerplate
-ROMEXT  := bin
+ROMNAME := gbemu
+ROMEXT  := sfc
 
 
