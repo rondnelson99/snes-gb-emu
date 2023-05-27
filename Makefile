@@ -27,7 +27,7 @@ endif
 
 # Shortcut if you want to use a local copy of WLA
 WLA     := 
-WLA6502 := $(WLA)wla-6502
+WLA65816 := $(WLA)wla-65816
 WLALINK := $(WLA)wlalink
 
 ROM = $(BINDIR)/$(ROMNAME).$(ROMEXT)
@@ -75,10 +75,9 @@ rebuild:
 ###############################################
 
 # How to build a ROM
-$(BINDIR)/%.$(ROMEXT) $(BINDIR)/%.sym: $(patsubst src/%.asm,$(OBJDIR)/%.o,$(SRCS))
+$(BINDIR)/%.$(ROMEXT): $(patsubst src/%.asm,$(OBJDIR)/%.o,$(SRCS))
 	@$(MKDIR_P) $(@D)
 	$(WLALINK) $(LDFLAGS)  -s    -r linkfile $(BINDIR)/$*.$(ROMEXT) 
-	src/tools/debugmap.py $(BINDIR)/$*.sym 
 # `.mk` files are auto-generated dependency lists of the "root" ASM files, to save a lot of hassle.
 # Also add all obj dependencies to the dep file too, so Make knows to remake it
 
@@ -86,8 +85,8 @@ $(BINDIR)/%.$(ROMEXT) $(BINDIR)/%.sym: $(patsubst src/%.asm,$(OBJDIR)/%.o,$(SRCS
 
 $(OBJDIR)/%.o $(DEPDIR)/%.mk : src/%.asm
 	@$(MKDIR_P) $(patsubst %/,%,$(dir $(OBJDIR)/$* $(DEPDIR)/$*))
-	$(WLA6502) $(ASFLAGS) -M $< > $(DEPDIR)/$*.mk
-	$(WLA6502) $(ASFLAGS) -o $(OBJDIR)/$*.o $<
+	$(WLA65816) $(ASFLAGS) -M $< > $(DEPDIR)/$*.mk
+	$(WLA65816) $(ASFLAGS) -o $(OBJDIR)/$*.o $<
 
 ifneq ($(MAKECMDGOALS),clean)
 -include $(patsubst src/%.asm,$(DEPDIR)/%.mk,$(SRCS))
@@ -104,12 +103,6 @@ endif
 # This line causes assets not found in `res/` to be also looked for in `src/res/`
 # "Source" assets can thus be safely stored there without `make clean` removing them
 VPATH := src
-
-# Define how to compress files using the PackBits16 codec
-# Compressor script requires Python 3
-res/%.pb16: src/tools/pb16.py res/%
-	@$(MKDIR_P) $(@D)
-	$^ $@
 
 # Catch non-existent files
 # KEEP THIS LAST!!
