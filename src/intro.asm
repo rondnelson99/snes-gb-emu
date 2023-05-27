@@ -32,8 +32,7 @@ Intro:
     jmp.l ResetFastROM
 .ENDS
 
-.BASE $80 ; place in FastROM area
-.SECTION "ResetFastROM", SUPERFREE
+.SECTION "ResetFastROM", BASE $80 SUPERFREE
 ResetFastROM:
     setaxy16
     ldx #STACK_BOTTOM
