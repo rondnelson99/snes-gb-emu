@@ -1,9 +1,0 @@
-On the Gameboy, we can think of VRAM as divided into eight 1KB blocks:
-
-Blocks 1 and 2 are used for sprite tiles $00-$7F, or optionally background tiles as well
-Blocks 3 and 4 are used for sprite AND background tiles $80-$FF00
-Blocks 5 and 6 are optionally used for background tiles $00-$7F
-Block 7 is the first ($9800) background tilemap
-Block 8 is the second ($9C00) background tilemap
-
-The SNES has much more VRAM, but we need to very carefully arrange parts to copy the gaemboy VRAM over directly

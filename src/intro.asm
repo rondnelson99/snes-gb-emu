@@ -5,19 +5,6 @@ STACK_BOTTOM = $1FFF
 CPUIO_BASE   = $4200
 PPU_BASE     = $2100
 
-.SNESHEADER
-ID "GBEM"
-NAME "Game Boy Emulator"
-LOROM
-FASTROM
-CARTRIDGETYPE $01
-ROMSIZE $08
-SRAMSIZE $03
-COUNTRY $01
-LICENSEECODE $00
-VERSION $01
-
-.ENDSNES
 
 .SECTION "Reset Vector", ORGA $FFFC FORCE
     .dw Intro
@@ -31,6 +18,50 @@ Intro:
     cld                ; turn off decimal ADC/SBC
     jmp.l ResetFastROM
 .ENDS
+
+    ; These routines each copy small 1K chunks of data from WRAM to VRAM using a macro
+.macro DMAVRAMChunk ARGS src, dest, len, mode, incmode ; src is an Extended WRAM address, 
+;dest is a 16-bit VRAM address, len is a 16-bit length, opts get written to DMAMODE, incmode gets written to PPUCTRL if provided
+    
+    ; assume a16, xy8
+    ; the dma registers look like this:
+    ; $43x0: DMAMODE: includes write pattern, bus direction, A bus increment
+    ; $43x1: destination PPU register
+    ; $43x2-3: source address
+    ; $43x4: source bank
+    ; $43x5-6: length
+    .accu 16
+    .index 8
+
+    ; write mode and dest register at the same time
+    lda # mode | <VMDATAL << 8
+    sta DMAMODE
+    ; write source address
+    lda # src
+    sta DMAADDR
+    ; write the bank
+    ldx # BANK(src)
+    stx DMAADDRBANK
+    ; write the high byte of the length 
+    .assert (len & $ff) == 0
+    ldx #>len
+    stx DMALENHI
+    ; write the VRAM destination address
+    lda # dest
+    sta.l VMADDL
+    ; start the DMA transfer
+    seta8
+
+    .if NARGS == 5
+        lda # incmode
+        sta.l PPUCTRL
+    .endif
+
+    lda #$01
+    sta.l COPYSTART
+    seta16
+
+.endm
 
 .SECTION "ResetFastROM", BASE $80 SUPERFREE
 ResetFastROM:
@@ -109,24 +140,24 @@ ResetFastROM:
     lda #$01
     sta MEMSEL
 
-    ; DMA The VRAM image from ROM to WRAM
+    ; DMA The GB image from ROM to WRAM
 
     ; set the DMA registers
     ; source address
-    lda #BANK(VRAMImage)
+    lda #BANK(GBImage)
     sta.w DMAADDRBANK
-    ldx #VRAMImage
+    ldx #GBImage
     stx.w DMAADDR
     ; dest address
     lda #<WMDATA
     sta.w DMAPPUREG
     ldx #$8000
     stx.w WMADDL
-    lda #1 ; bank
+    lda #$7F ; bank
     sta.w WMADDH
 
     ; length
-    ldx #VRAMImageEnd - VRAMImage
+    ldx #GBImageEnd - GBImage
     stx.w DMALEN
     ; other properties
     stz.w DMAMODE ; default properties
@@ -134,6 +165,60 @@ ResetFastROM:
     ; finally, start the DMA transfer
     lda #$01 ; Channel 0
     sta.w COPYSTART
+
+    ; Zero all of VRAM
+    ; set the DMA registers
+    ; source address
+    lda #BANK(Zero)
+    sta.w DMAADDRBANK
+    ldx #Zero
+    stx.w DMAADDR
+    ; dest address
+    lda #<VMDATAL
+    sta.w DMAPPUREG
+    ldx #0
+    stx.w VMADDL
+
+    ; length
+    ldx #$8000
+    stx.w DMALEN
+    ; other properties
+    lda # DMA_01 | DMA_CONST ; static PPU DMA
+    sta.w DMAMODE
+    lda #$01 ; Channel 0
+    sta.w COPYSTART
+
+    ; park the direct page in the DMA registers
+    seta16
+    setxy8
+    lda #$4300
+    tad
+
+    DMAVRAMChunk GB_VRAM_SPRITETILES, VRAM_SPRITE_TILES, $400, DMA_01
+    DMAVRAMChunk GB_VRAM_SPRITETILES + $400, VRAM_SPRITE_TILES + $200, $400, DMA_01
+    DMAVRAMChunk GB_VRAM_SHAREDTILES, VRAM_SPRITE_TILES + $400, $400, DMA_01
+    DMAVRAMChunk GB_VRAM_SHAREDTILES+ $400, VRAM_SPRITE_TILES + $600, $400, DMA_01
+    DMAVRAMChunk GB_VRAM_BGTILES, VRAM_BG_TILES, $400, DMA_01
+    DMAVRAMChunk GB_VRAM_BGTILES + $400, VRAM_BG_TILES + $200, $400, DMA_01
+    DMAVRAMChunk GB_VRAM_SHAREDTILES, VRAM_BG_TILES + $400, $400, DMA_01
+    DMAVRAMChunk GB_VRAM_SHAREDTILES+ $400, VRAM_BG_TILES + $600, $400, DMA_01
+    ; set VRAM to increment on low byte
+    DMAVRAMChunk GB_VRAM_TILEMAP1, VRAM_BG_TILEMAP_1, $400, DMA_LINEAR, 0
+    DMAVRAMChunk GB_VRAM_TILEMAP2, VRAM_BG_TILEMAP_2, $400, DMA_LINEAR
+
+    seta8
+    lda #5 << 3
+    sta.l BG1SC
+    lda #2
+    sta.l BG12NBA
+
+Zero:
+    .db 0
+
+
+
+
+
 
 
 
@@ -150,8 +235,8 @@ ResetFastROM:
 
 .ENDS
 
-.SECTION "Gameboy VRAM image", BASE $80 SUPERFREE
-VRAMImage:
-    .INCBIN "res/vram.bin"
-VRAMImageEnd:
+.SECTION "Gameboy image", BASE $80 SUPERFREE
+GBImage:
+    .INCBIN "res/gb.bin"
+GBImageEnd:
 .ENDS

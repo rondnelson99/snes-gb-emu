@@ -1,2 +1,5 @@
 [objects]
+obj/vram.o
+obj/gbmemory.o
 obj/intro.o
+
