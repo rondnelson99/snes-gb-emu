@@ -206,6 +206,33 @@ ResetFastROM:
     DMAVRAMChunk GB_VRAM_TILEMAP1, VRAM_BG_TILEMAP_1, $400, DMA_LINEAR, 0
     DMAVRAMChunk GB_VRAM_TILEMAP2, VRAM_BG_TILEMAP_2, $400, DMA_LINEAR
 
+    ; temporarily move the stack to Low RAM
+    seta16
+    setxy8
+    lda #$1fff
+    tas
+
+    ; set the DBR to $7F
+    ldx #$7F
+    phx
+    plb
+
+    ; dispatch a BGP write
+    seta8
+    lda.l GB_MEMORY + $FF47 ; get the value in rBGP
+    tay
+    ldx #$47 ; prep the handler
+    jsl DispatchIOWrite
+
+    ; dispatch an OBP0 write
+    seta8
+    lda.l GB_MEMORY + $FF48 ; get the value in rBGP
+    tay
+    ldx #$48 ; prep the handler
+    jsl DispatchIOWrite
+
+
+
     seta8
     lda #5 << 3
     sta.l BG1SC

@@ -4,13 +4,18 @@
 	SLOT 1 START $0 SIZE $2000 NAME "LORAM"
 	SLOT 2 START $2000 SIZE $E000 NAME "HIRAM"
   SLOT 3 START $0 SIZE $10000 NAME "EXRAM"
+  SLOT 4 START $4300 SIZE $80 NAME "DMA"
 .ENDME
 
 .ROMBANKMAP
-BANKSTOTAL 2
+BANKSTOTAL 4
 BANKSIZE $8000
-BANKS 2
+BANKS 4
 .ENDRO
+
+; define some constant banks
+IOHANDLERBANK = 3
+
 
 .SNESHEADER
 ID "GBEM"
@@ -27,6 +32,7 @@ VERSION $01
 .ENDSNES
 
 .INCLUDE "include/snes.inc"
+.INCLUDE "include/config.inc"
 
 ;;
 ; Sets the X and Y registers to use 8-bit values.
