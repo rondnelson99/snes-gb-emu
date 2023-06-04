@@ -226,9 +226,15 @@ ResetFastROM:
 
     ; dispatch an OBP0 write
     seta8
-    lda.l GB_MEMORY + $FF48 ; get the value in rBGP
+    lda.l GB_MEMORY + $FF48 ; get the value in rOBP0
     tay
     ldx #$48 ; prep the handler
+    jsl DispatchIOWrite
+
+    ; dispatch an OBP1 write
+    lda.l GB_MEMORY + $FF49 ; get the value in rOBP1
+    tay
+    ldx #$49 ; prep the handler
     jsl DispatchIOWrite
 
 

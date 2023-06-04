@@ -114,9 +114,8 @@ PaletteEntriesHigh:
     .db hibyte(COLOR_BLACK)
 .ENDS
 
-GetIOTableAddress $48 ; OBP1
-.SECTION "OBP1 Handler", BANK IOHANDLERBANK BASE $80 ORGA io_table_address FORCE
-; this is similar to the BGP handler, but his time we generate the colors ahead of time,
+.MACRO HandleOBP ARGS TableAddress CGIndex 
+    ; this is similar to the BGP handler, but his time we generate the colors ahead of time,
 ; and then make more complex arrangements of them
     setaxy16
     .8BIT
@@ -132,7 +131,7 @@ GetIOTableAddress $48 ; OBP1
     asl ; double for the word-sized table
     and #%110 ; mask down to just the color index
     tax ; use it as an index
-    lda.l PaletteEntriesOBP1, x ; get the palette entry
+    lda.l TableAddress, x ; get the palette entry
     sta.w EchoScratchpad ; store it
 
     ; color 1
@@ -140,7 +139,7 @@ GetIOTableAddress $48 ; OBP1
     lsr
     and #%110
     tax
-    lda.l PaletteEntriesOBP1, x
+    lda.l TableAddress, x
     sta.w EchoScratchpad + 2
 
     ; color 2
@@ -151,7 +150,7 @@ GetIOTableAddress $48 ; OBP1
     tay
     and #%110
     tax
-    lda.l PaletteEntriesOBP1, x
+    lda.l TableAddress, x
     sta.w EchoScratchpad + 4
 
     ; color 3
@@ -160,7 +159,7 @@ GetIOTableAddress $48 ; OBP1
     lsr
     and #%110
     tax
-    lda.l PaletteEntriesOBP1, x
+    lda.l TableAddress, x
     sta.w EchoScratchpad + 6
 
     ; now all our colors are in the EchoScratchpad
@@ -183,7 +182,7 @@ GetIOTableAddress $48 ; OBP1
     stx <DMALEN ; length
 
     ; set the address. W'll start with Sprite palette 0, which is at $80
-    lda #$80
+    lda #CGIndex
     sta.l CGADD
     ; start the DMA
     lda #%1
@@ -237,13 +236,35 @@ GetIOTableAddress $48 ; OBP1
         stx <CGDATA
         sty <CGDATA
     .endr
+    ; return the direct page to the DMA registers
+    lda #$4300
+    tad
     returnFromIOHandler
+.ENDM
+
+GetIOTableAddress $48 ; OBP0
+.SECTION "OBP0 Handler", BANK IOHANDLERBANK BASE $80 ORGA io_table_address FORCE
+    HandleOBP PaletteEntriesOBP0, $80
+.ENDS
+
+GetIOTableAddress $49 ; OBP1
+.SECTION "OBP1 Handler", BANK IOHANDLERBANK BASE $80 ORGA io_table_address FORCE
+    HandleOBP PaletteEntriesOBP1, $A0
 .ENDS
 
 
-.SECTION "OBP1 Palette entry tables", BASE $80 SUPERFREE
+
+.SECTION "OBP0 Palette entry tables", BASE $80 SUPERFREE
 ; here we use a single little-endian table for high and low bytes
 ; index with a color number (0-3) << 1 to get the palette entry for that color
+PaletteEntriesOBP0:
+    .dw COLOR_WHITE_OBP0
+    .dw COLOR_LIGHT_GRAY_OBP0
+    .dw COLOR_DARK_GRAY_OBP0
+    .dw COLOR_BLACK_OBP0
+.ENDS
+
+.SECTION "OBP1 Palette entry tables", BASE $80 SUPERFREE
 PaletteEntriesOBP1:
     .dw COLOR_WHITE_OBP1
     .dw COLOR_LIGHT_GRAY_OBP1
