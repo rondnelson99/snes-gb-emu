@@ -14,6 +14,7 @@ BANKS 4
 .ENDRO
 
 ; define some constant banks
+OPCODEBANK = 2
 IOHANDLERBANK = 3
 
 

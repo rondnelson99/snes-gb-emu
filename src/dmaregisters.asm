@@ -42,3 +42,14 @@ DMA_UNUSABLE_7: ds 4
 .RAMSECTION "Scratchpad" SLOT "DMA"
 Scratchpad: ds 8
 .ENDS
+; define registers for the GB
+.RAMSECTION "Registers" SLOT "DMA"
+GB_A: db
+GB_BC: dw
+GB_DE: dw
+GB_HL: dw
+GB_SP: dw
+GB_ZEROFLAG: db
+GB_CARRYFLAG: db
+GB_INVCARRY: db
+.ENDS

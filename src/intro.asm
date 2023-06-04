@@ -141,7 +141,28 @@ ResetFastROM:
     sta MEMSEL
 
     ; DMA The GB image from ROM to WRAM
+    ; set the DMA registers
+    ; source address
+    lda #BANK(GBRom)
+    sta.w DMAADDRBANK
+    ldx #GBRom
+    stx.w DMAADDR
+    ; dest address
+    lda #<WMDATA
+    sta.w DMAPPUREG
+    ldx #$0000
+    stx.w WMADDL
+    lda #$7F ; bank
+    sta.w WMADDH
+    ; length
+    ldx #GBRomEnd - GBRom
+    stx.w DMALEN
+    ; other properties
+    stz.w DMAMODE ; default properties
 
+    ; finally, start the DMA transfer
+    lda #$01 ; Channel 0
+    sta.w COPYSTART
     ; set the DMA registers
     ; source address
     lda #BANK(GBImage)
@@ -240,7 +261,15 @@ ResetFastROM:
     phx
     plb
 
-    ; dispatch a BGP write
+    ; move the SP to start popping opcodes
+    lda #$8000 - 1
+    tcs
+
+    ; jump to the opcode handler!
+    jmp.l StartDispatchOpcode
+    
+
+/*    ; dispatch a BGP write
     seta8
     lda.l GB_MEMORY + $FF47 ; get the value in rBGP
     tay
@@ -307,31 +336,10 @@ TransferSprite:
     tya
     cmp #160
     bne TransferSprite
-
-
-
-
-
-
-
+*/
 
 Zero:
     .db 0
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -342,6 +350,12 @@ Zero:
 GBImage:
     .INCBIN "res/gb.bin"
 GBImageEnd:
+.ENDS
+
+.SECTION "Gameboy ROM Image", BASE $80 BANK 0 ORGA $8000 FORCE
+GBRom:
+    .INCBIN "res/DMG_ROM.bin"
+GBRomEnd:
 .ENDS
 
 .SECTION "OAM Flag Translation Table", BASE $80 SUPERFREE

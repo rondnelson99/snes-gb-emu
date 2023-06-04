@@ -39,6 +39,7 @@ DispatchIOWrite:
 
 GetIOTableAddress $47 ; BGP
 .SECTION "BGP Handler", BANK IOHANDLERBANK BASE $80 ORGA io_table_address FORCE
+BGPHandler:
 .index 8
     seta16
     ; move the direct page to the PPU registers (which has the CGRAM port in it)
@@ -244,11 +245,13 @@ PaletteEntriesHigh:
 
 GetIOTableAddress $48 ; OBP0
 .SECTION "OBP0 Handler", BANK IOHANDLERBANK BASE $80 ORGA io_table_address FORCE
+OBP0Handler:
     HandleOBP PaletteEntriesOBP0, $80
 .ENDS
 
 GetIOTableAddress $49 ; OBP1
 .SECTION "OBP1 Handler", BANK IOHANDLERBANK BASE $80 ORGA io_table_address FORCE
+OBP1Handler:
     HandleOBP PaletteEntriesOBP1, $A0
 .ENDS
 
