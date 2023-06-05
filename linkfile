@@ -4,5 +4,6 @@ obj/vram.o
 obj/gbmemory.o
 obj/iohandlers.o
 obj/opcodes.o
+obj/cbprefix.o
 obj/intro.o
 

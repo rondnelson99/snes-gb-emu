@@ -89,8 +89,47 @@ GetOpcodeTableAddress $32
 .SECTION "ld (hl-), a", BANK OPCODEBANK BASE $80 ORGA opcode_table_address FORCE
 LD_HL_DEC_A: ; We'll assume this isn't used to access IO
     seta16
-    sty (<GB_HL)
+    sty (lobyte(GB_HL))
     dec <GB_HL
+    DispatchOpcode
+.ENDS
+
+GetOpcodeTableAddress $CB
+.SECTION "CB prefix", BANK OPCODEBANK BASE $80 ORGA opcode_table_address FORCE
+CB_PREFIX:
+    plx
+    jmp.l StartDispatchPrefix
+.ENDS
+
+GetOpcodeTableAddress $20
+.SECTION "jr nz", BANK OPCODEBANK BASE $80 ORGA opcode_table_address FORCE
+JR_NZ:
+    ldx <GB_ZEROFLAG
+    beq @noJump
+@jump
+    seta8
+    tsc
+    sec ; this essentially increments the PC to step past the offset byte
+    adc 1,s ; add the offset byte to the PC
+    xba ; look at the high byte
+    ; now test the sign
+    plx
+    bpl @branchForward
+    ; if negative, dec the high byte (but also add the carry)
+    adc #-1
+    xba
+    tcs
+    DispatchOpcode
+@branchForward
+    ; if positive, only add the carry
+    adc #0
+    xba
+    tcs
+    DispatchOpcode
+
+
+@noJump
+    plx ; discard the offset byte
     DispatchOpcode
 .ENDS
 
