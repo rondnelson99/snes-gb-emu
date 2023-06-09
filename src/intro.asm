@@ -163,7 +163,7 @@ ResetFastROM:
     ; finally, start the DMA transfer
     lda #$01 ; Channel 0
     sta.w COPYSTART
-    ; set the DMA registers
+   /* ; set the DMA registers
     ; source address
     lda #BANK(GBImage)
     sta.w DMAADDRBANK
@@ -185,7 +185,7 @@ ResetFastROM:
 
     ; finally, start the DMA transfer
     lda #$01 ; Channel 0
-    sta.w COPYSTART
+    sta.w COPYSTART*/
 
     ; Zero all of VRAM
     ; set the DMA registers

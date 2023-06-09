@@ -62,4 +62,4 @@ gb_bit $41, 0, GB_BC
 gb_bit $42, 0, GB_DE + 1
 gb_bit $43, 0, GB_DE
 
-gb_bit $7C, 7, GB_HL
+gb_bit $7C, 7, GB_HL + 1

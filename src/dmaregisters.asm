@@ -51,5 +51,4 @@ GB_HL: dw
 GB_SP: dw
 GB_ZEROFLAG: db
 GB_CARRYFLAG: db
-GB_INVCARRY: db
 .ENDS
