@@ -74,9 +74,9 @@ RLC_HL:
     seta8
     setxy16
     ldx <GB_HL
-    lda GB_MEMORY,x
+    lda.w GB_MEMORY,x
     asl a ; rotate a copy into carry
-    rol GB_MEMORY,x
+    rol.w GB_MEMORY,x
     ror <GB_CARRYFLAG
     setaxy8
     FinishPrefix
@@ -121,9 +121,9 @@ RRC_HL:
     seta8
     setxy16
     ldx <GB_HL
-    lda GB_MEMORY,x
+    lda.w GB_MEMORY,x
     ror a ; rotate a copy into carry
-    ror GB_MEMORY,x
+    ror.w GB_MEMORY,x
     ror <GB_CARRYFLAG
     setaxy8
     FinishPrefix
@@ -168,7 +168,7 @@ RL_HL:
     setxy16
     ldx <GB_HL
     rol <GB_CARRYFLAG
-    rol GB_MEMORY,x
+    rol.w GB_MEMORY,x
     ror <GB_CARRYFLAG
     setaxy8
     FinishPrefix
@@ -212,7 +212,7 @@ RR_HL:
     setxy16
     ldx <GB_HL
     rol <GB_CARRYFLAG
-    ror GB_MEMORY,x
+    ror.w GB_MEMORY,x
     ror <GB_CARRYFLAG
     setaxy8
     FinishPrefix
@@ -254,7 +254,7 @@ SLA_HL:
     seta8
     setxy16
     ldx <GB_HL
-    asl GB_MEMORY,x
+    asl.w GB_MEMORY,x
     ror <GB_CARRYFLAG
     setaxy8
     FinishPrefix
@@ -297,9 +297,9 @@ SRA_HL:
     seta8
     setxy16
     ldx <GB_HL
-    lda GB_MEMORY,x
+    lda.w GB_MEMORY,x
     asl a ; shift a copy into carry
-    ror GB_MEMORY,x
+    ror.w GB_MEMORY,x
     ror <GB_CARRYFLAG
     setaxy8
     FinishPrefix
@@ -392,7 +392,7 @@ SRL_HL:
     seta8
     setxy16
     ldx <GB_HL
-    lsr GB_MEMORY,x
+    lsr.w GB_MEMORY,x
     ror <GB_CARRYFLAG
     setaxy8
     FinishPrefix

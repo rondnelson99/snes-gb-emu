@@ -260,7 +260,7 @@ LD_D16_A:
     setxy16
     tya
     plx
-    sta GB_MEMORY,x
+    sta.w GB_MEMORY,x
     setxy8
     DispatchOpcode
 .ENDS
@@ -270,7 +270,7 @@ GetOpcodeTableAddress $FA
 LD_A_D16:
     setxy16
     plx
-    ldy GB_MEMORY,x ; this loads a second byte, but that gets discarded nest
+    ldy.w GB_MEMORY,x ; this loads a second byte, but that gets discarded nest
     setxy8 ; this saves time overall
     DispatchOpcode
 .ENDS
@@ -304,6 +304,14 @@ LDH_A_A8: ; NOT IMPLEMENTED
 GetOpcodeTableAddress $32
 .SECTION "ld (hl-), a", BANK OPCODEBANK BASE $80 ORGA opcode_table_address FORCE
 LD_HL_DEC_A: ; We'll assume this isn't used to access IO
+.IF CONFIG_LDD_CAN_WRITE_IO == 1
+    seta8
+    setxy16
+    ldx <GB_HL   
+    seta16
+    dec <GB_HL
+    DispatchOpcode
+.ELSE  
     seta8
     tya
     .db $92 ; sta (dp)
@@ -311,6 +319,8 @@ LD_HL_DEC_A: ; We'll assume this isn't used to access IO
     seta16
     dec <GB_HL
     DispatchOpcode
+.ELSE  
+.ENDIF
 .ENDS
 
 GetOpcodeTableAddress $22
@@ -373,7 +383,7 @@ LD_a16_SP:
     setaxy16
     plx
     lda <GB_SP
-    sta GB_MEMORY,x
+    sta.w GB_MEMORY,x
     setxy8
     DispatchOpcode
 .ENDS
@@ -406,7 +416,7 @@ PUSH_RR\@:
     dex 
     dex 
     lda <regpair 
-    sta GB_MEMORY,x  
+    sta.w GB_MEMORY,x  
     stx <GB_SP 
     setxy8 
     DispatchOpcode
@@ -431,7 +441,7 @@ GetOpcodeTableAddress opcode
 POP_RR\@:
     setaxy16 
     ldx <GB_SP
-    lda GB_MEMORY,x
+    lda.w GB_MEMORY,x
     sta <regpair
     inx
     inx
@@ -1005,7 +1015,7 @@ INC_HL:
     seta8
     setxy16
     ldx <GB_HL
-    inc GB_MEMORY,x
+    inc.w GB_MEMORY,x
     setxy8
     beq @setZero   
 @clearZero
@@ -1053,7 +1063,7 @@ DEC_HL:
     seta8
     setxy16
     ldx <GB_HL
-    dec GB_MEMORY,x
+    dec.w GB_MEMORY,x
     setxy8
     beq @setZero
 @clearZero
@@ -1078,6 +1088,129 @@ CB_PREFIX:
     plx
     jmp.l StartDispatchPrefix
 .ENDS
+
+;--------------------------------------
+; Other 8-bit ALU
+
+GetOpcodeTableAddress $07
+.SECTION "rlca", BANK OPCODEBANK BASE $80 ORGA opcode_table_address FORCE
+RLCA:
+    seta8
+    tya
+    rol a
+    tya
+    rol a
+    tay
+    ror <GB_CARRYFLAG
+    DispatchOpcode
+.ENDS
+
+GetOpcodeTableAddress $0F
+.SECTION "rrca", BANK OPCODEBANK BASE $80 ORGA opcode_table_address FORCE
+RRCA:
+    seta8
+    tya
+    ror a
+    tya
+    ror a
+    tay
+    ror <GB_CARRYFLAG
+    DispatchOpcode
+.ENDS
+
+GetOpcodeTableAddress $17
+.SECTION "rla", BANK OPCODEBANK BASE $80 ORGA opcode_table_address FORCE
+RLA:
+    seta8
+    rol <GB_CARRYFLAG
+    tya
+    rol a
+    tay
+    ror <GB_CARRYFLAG
+    DispatchOpcode
+.ENDS
+
+GetOpcodeTableAddress $1F
+.SECTION "rra", BANK OPCODEBANK BASE $80 ORGA opcode_table_address FORCE
+RRA:
+    seta8
+    ror <GB_CARRYFLAG
+    tya
+    ror a
+    tay
+    ror <GB_CARRYFLAG
+    DispatchOpcode
+.ENDS
+
+GetOpcodeTableAddress $27
+.SECTION "daa", BANK OPCODEBANK BASE $80 ORGA opcode_table_address FORCE
+DAA:
+    ; NOT IMPLEMENTED
+    DispatchOpcode
+.ENDS
+
+GetOpcodeTableAddress $2F
+.SECTION "cpl", BANK OPCODEBANK BASE $80 ORGA opcode_table_address FORCE
+CPL:
+    seta8
+    tya
+    eor #$FF
+    sta <GB_ZEROFLAG
+    tay
+    DispatchOpcode
+.ENDS
+
+GetOpcodeTableAddress $37
+.SECTION "scf", BANK OPCODEBANK BASE $80 ORGA opcode_table_address FORCE
+SCF:
+    ldx #$80
+    stx <GB_CARRYFLAG
+    DispatchOpcode
+.ENDS
+
+GetOpcodeTableAddress $3F
+.SECTION "ccf", BANK OPCODEBANK BASE $80 ORGA opcode_table_address FORCE
+CCF:
+    ldx <GB_CARRYFLAG
+    eor #$80
+    stx <GB_CARRYFLAG
+    DispatchOpcode
+.ENDS
+
+;--------------------------------------
+; 16-bit arithmetic/logic
+;--------------------------------------
+
+.macro inc_rr ARGS opcode, regpair
+GetOpcodeTableAddress opcode
+.SECTION "inc rr\@", BANK OPCODEBANK BASE $80 ORGA opcode_table_address FORCE
+INC_RR\@:
+    seta16
+    inc <regpair
+    DispatchOpcode
+.ENDS
+.endm
+
+inc_rr $03, GB_BC
+inc_rr $13, GB_DE
+inc_rr $23, GB_HL
+inc_rr $33, GB_SP
+
+.macro dec_rr ARGS opcode, regpair
+GetOpcodeTableAddress opcode
+.SECTION "dec rr\@", BANK OPCODEBANK BASE $80 ORGA opcode_table_address FORCE
+DEC_RR\@:
+    seta16
+    dec <regpair
+    DispatchOpcode
+.ENDS
+.endm
+
+dec_rr $0B, GB_BC
+dec_rr $1B, GB_DE
+dec_rr $2B, GB_HL
+dec_rr $3B, GB_SP
+
 
 ;--------------------------------------
 ; Control flow
@@ -1212,7 +1345,7 @@ CALL_{condition}:
     ldx <GB_SP
     dex
     dex
-    sta GB_MEMORY,x
+    sta.w GB_MEMORY,x
     stx <GB_SP
     pla ; fetch the destination address
     dec a ; step back since 65xx increments at the start of pull
@@ -1258,11 +1391,12 @@ RET_{condition}:
 @jump
     setxy16
     ldx <GB_SP
-    lda GB_MEMORY,x
+    lda.w GB_MEMORY,x
     inx
     inx
     stx <GB_SP
     tas
+    setxy8
     DispatchOpcode
 
 @noJump
