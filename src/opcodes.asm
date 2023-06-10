@@ -177,8 +177,9 @@ GetOpcodeTableAddress opcode
 .SECTION "ld a, [rr]\@", BANK OPCODEBANK BASE $80 ORGA opcode_table_address FORCE
 LD_A_RR\@:
     ; I would seta8 here but it's actually faster to just not care, and the high byte gets discarded by tay
-    .db $B2 ; lda (dp)
-    .db <reg ; gets around a stupid WLA-DX issue
+    lda (<reg)
+    /*.db $B2 ; lda (dp)
+    .db <reg ; gets around a stupid WLA-DX issue*/
     tay
     DispatchOpcode
 .ENDS
