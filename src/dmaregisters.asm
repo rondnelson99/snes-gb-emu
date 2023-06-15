@@ -52,3 +52,8 @@ GB_SP: dw
 GB_ZEROFLAG: db
 GB_CARRYFLAG: db
 .ENDS
+; define flags for the emulator
+.RAMSECTION "Flags" SLOT "DMA"
+FLAG_VBLANK: db ; bit 7 is set when VBLANK is active. checked/tested by the jr nz handler
+VBLANK_COUNTER: db ; counts the number of VBLANKs that have passed * 2 mod 10. used to DMA rotating VRAM chunks
+.ENDS

@@ -33,8 +33,96 @@ DispatchIOWrite:
 
 ; assume index registers are 8bit, with value to write in y
 .macro returnFromIOHandler
-    rtl ; placeholder
+    jmp.l StartDispatchOpcode
 .endm
+
+.macro skipIORegister args addr
+GetIOTableAddress addr
+.SECTION "skip IO register\@", BANK IOHANDLERBANK BASE $80 ORGA io_table_address FORCE
+skipIORegister\@:
+    returnFromIOHandler
+.ENDS
+.endm
+
+;----------------------------------------
+; Sound registers (not implemented)
+;----------------------------------------
+
+; skip addresses $10-$3F
+.rept $40 - $10 INDEX soundreg
+    skipIORegister soundreg + $10
+.endr
+
+
+GetIOTableAddress $40 ; LCDC: The hard one
+.SECTION "LCDC Handler", BANK IOHANDLERBANK BASE $80 ORGA io_table_address FORCE
+LCDCHandler:
+    ; The 8 bits of LCDC are:
+    ; 7: Display enable
+    ; 6: Window tile map: 0=9800, 1=9C00
+    ; 5: Window enable
+    ; 4: BG & Window tile data: 0=8800, 1=8000
+    ; 3: BG tile map: 0=9800, 1=9C00
+    ; 2: OBJ size: 0=8x8, 1=8x16
+    ; 1: OBJ enable
+    ; 0: BG & Window enable
+
+    ; for now, we'll only implement bits 3 and 4
+
+    seta8
+    tya
+    ldx # (VRAM_BG_TILEMAP_1 >> 10) << 2
+    bit #%00001000 ; BG tile map
+    beq @BGTilemap1
+@BGTilemap2
+    ldx # (VRAM_BG_TILEMAP_2 >> 10) << 2
+@BGTilemap1
+    ; store the tilemap address
+    txa
+    sta.l BG1SC
+
+    tya
+    ldx # VRAM_BG_TILES >> 12
+    bit #%00010000 ; BG tile data
+    beq @BGTiles
+@BGSharedTiles
+    ldx # VRAM_SPRITE_TILES >> 12
+@BGTiles
+    ; store the tile data address
+    txa
+    sta.l BG12NBA
+
+    returnFromIOHandler
+.ENDS
+
+    
+
+
+
+
+GetIOTableAddress $42 ; SCY
+.SECTION "SCY Handler", BANK IOHANDLERBANK BASE $80 ORGA io_table_address FORCE
+SCYHandler:
+    seta8
+    tya
+    ; store the value into emulated memory
+    sta.w GB_MEMORY + $FF42
+    sta.l BG1VOFS ; write the value
+    sta.l BG1VOFS ; write the second byte (doesn't matter in this case)
+    returnFromIOHandler
+.ENDS
+
+GetIOTableAddress $43 ; SCX
+.SECTION "SCX Handler", BANK IOHANDLERBANK BASE $80 ORGA io_table_address FORCE
+SCXHandler:
+    seta8
+    tya
+    sta.w GB_MEMORY + $FF43
+    sta.l BG1HOFS ; write the value
+    sta.l BG1HOFS ; write the second byte (doesn't matter in this case)
+    returnFromIOHandler
+.ENDS
+
 
 
 GetIOTableAddress $47 ; BGP

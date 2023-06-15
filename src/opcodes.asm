@@ -5,7 +5,7 @@
     .if I # 2 == 0 ; if even
         .redef opcode_table_byte, (I & $7f) | $80 
     .else
-        .redef opcode_table_byte, ((I + 40) & $7f) | $80 
+        .redef opcode_table_byte, ((I + 68) & $7f) | $80 
     .endif
 .elif I == $FF ; the last entry is special to avoid $fffe
     .redef opcode_table_byte, $80
@@ -27,6 +27,7 @@
 .endm
 
 
+
 .SECTION "opcode jump table", BANK OPCODEBANK BASE $80 FREE
 OpcodeJumpTable: ; contains a jump table rith relatively spaced-out entries
 .repeat 257 INDEX tablebyte
@@ -37,7 +38,7 @@ OpcodeJumpTable: ; contains a jump table rith relatively spaced-out entries
 
 /*.rept 256 INDEX opcode
     GetOpcodeTableAddress opcode
-    .print HEX opcode_table_address, "\n"
+    .print HEX opcode, " ", HEX opcode_table_address, "\n"
 .endr*/
 
 
@@ -189,21 +190,39 @@ ld_a_rr $0A, GB_BC
 ld_a_rr $1A, GB_DE
 ld_a_rr $7E, GB_HL
 
-.macro ld_rr_a ARGS opcode, reg
+.macro ld_rr_a ARGS opcode, reg, can_write_io
 GetOpcodeTableAddress opcode
 .SECTION "ld [rr], a\@", BANK OPCODEBANK BASE $80 ORGA opcode_table_address FORCE
 LD_RR_A\@:
     seta8
+.IF can_write_io == 1
     tya
-    .db $92 ; sta (dp)
-    .db <reg ; gets around a stupid WLA-DX issue
+    sta (<reg) ; gets around a stupid WLA-DX issue
     DispatchOpcode
+.ELSE
+    setxy16 
+    ldx <reg
+    cpx #$FF00 ; if this isn't in the IO range, there will be a borrow (carry clear)
+    bcs @maybeIo
+@notIo
+    tya
+    sta.w GB_MEMORY,x
+    setxy8
+    DispatchOpcode
+@maybeIo
+    .index 16
+    cpx #$FF80 ; if this is in the IO range, there will be a borrow (carry clear) (otherwise HRAM)
+    bcs @notIo
+@isIo
+    setxy8
+    jmp.l DispatchIOWrite
+.ENDIF
 .ENDS
 .endm
 
-ld_rr_a $02, GB_BC
-ld_rr_a $12, GB_DE
-ld_rr_a $77, GB_HL
+ld_rr_a $02, GB_BC, 0
+ld_rr_a $12, GB_DE, 0
+ld_rr_a $77, GB_HL, CONFIG_LD_HL_A_CAN_WRITE_IO
 
 .macro ld_r_hl ARGS opcode, reg
 GetOpcodeTableAddress opcode
@@ -278,6 +297,14 @@ LD_A_D16:
 GetOpcodeTableAddress $E2
 .SECTION "ld (c), a", BANK OPCODEBANK BASE $80 ORGA opcode_table_address FORCE
 LD_C_A: ; NOT IMPLEMENTED
+    ldx <GB_BC ; sets the n flag if this is in the IO range
+    bmi @notIo
+@isIo
+    jmp.l DispatchIOWrite
+@notIo ; in this case, we have an HRAM write
+    seta8
+    tya
+    sta.w GB_IO,x
     DispatchOpcode
 .ENDS
 
@@ -289,15 +316,23 @@ LD_A_C: ; NOT IMPLEMENTED
 
 GetOpcodeTableAddress $E0
 .SECTION "ldh (a8), a", BANK OPCODEBANK BASE $80 ORGA opcode_table_address FORCE
-LDH_A8_A: ; NOT IMPLEMENTED
+LDH_A8_A: 
     plx
+    bmi @notIo
+@isIo
+    jmp.l DispatchIOWrite
+@notIo ; in this case, we have an HRAM write
+    seta8
+    tya
+    sta.w GB_IO,x
     DispatchOpcode
 .ENDS
 
 GetOpcodeTableAddress $F0
 .SECTION "ldh a, (a8)", BANK OPCODEBANK BASE $80 ORGA opcode_table_address FORCE
-LDH_A_A8: ; NOT IMPLEMENTED
+LDH_A_A8: ; Might change this to use proper handler routines
     plx
+    ldy.w GB_IO,x
     DispatchOpcode
 .ENDS
 
@@ -307,10 +342,24 @@ LD_HL_DEC_A: ; We'll assume this isn't used to access IO
 .IF CONFIG_LDD_CAN_WRITE_IO == 1
     seta8
     setxy16
-    ldx <GB_HL   
-    seta16
-    dec <GB_HL
+    ldx <GB_HL
+    cpx #$FF00 ; if this isn't in the IO range, there will be a borrow (carry clear)
+    bcs @maybeIo
+@notIo
+    tya
+    sta.w GB_MEMORY,x
+    dex
+    stx <GB_HL
+    setxy8
     DispatchOpcode
+@maybeIo
+    .index 16
+    cpx #$FF80 ; if this is in the IO range, there will be a borrow (carry clear) (otherwise HRAM)
+    bcs @notIo
+@isIo
+    setxy8
+    jmp.l DispatchIOWrite
+
 .ELSE  
     seta8
     tya
@@ -1221,6 +1270,36 @@ GetOpcodeTableAddress opcode
 .SECTION "jr {condition}", BANK OPCODEBANK BASE $80 ORGA opcode_table_address FORCE
 JR_{condition}:
     .IF condition == "nonzero"
+        ; before executing jr nz, we update LY. This is a massive hack since we can't use interrupts
+
+        ; the implementation is simple: we read the scanline from the S-PPU, and then write it to rLY
+        ; read from SLHV to latch the current scanline
+        seta8
+        lda.l SLHV
+        ; read the latch
+        lda.l OPVCT
+        ; write the latch to rLY
+        sta.w GB_MEMORY + $FF44
+
+        ; check if we've reached Vblank
+        cmp #144
+        bcc @notVblank
+
+        bit <FLAG_VBLANK ; check if this Vblank is already handled
+        bmi FinishJRNZ
+
+@handleVBlank
+    jmp.l HandleVBlank
+
+
+@notVblank
+    stz <FLAG_VBLANK ; clear the VBLANK flag
+
+FinishJRNZ:
+        ; read the latch again to reset the flip-flop
+        lda.l OPVCT
+        
+
         ldx <GB_ZEROFLAG
         beq @noJump
     .ELIF condition == "zero"
