@@ -14,9 +14,12 @@ NUM_VRAM_CHUNKS = 10 ; VRAM is divided into 10 1KB chunks, and one chunk is DMA'
     ; $43x2-3: source address
     ; $43x4: source bank
     ; $43x5-6: length
-    .accu 16
     .index 8
+    seta8
+    lda #$80
+    sta.l INIDISP ; enable FBLANK
 
+    seta16
     ; write mode and dest register at the same time
     lda # mode | <VMDATAL << 8
     sta <DMAMODE
@@ -44,6 +47,10 @@ NUM_VRAM_CHUNKS = 10 ; VRAM is divided into 10 1KB chunks, and one chunk is DMA'
     lda #$01
     sta.l COPYSTART
     seta16
+
+    ; disable FBLANK
+    lda #15 ; full brightness
+    sta.l INIDISP
 
 .endm
 

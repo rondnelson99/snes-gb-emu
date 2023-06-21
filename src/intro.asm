@@ -202,7 +202,14 @@ ResetFastROM:
     stx <VBLANK_COUNTER
    
     
-    ; set VRAM to increment on low byte
+    ; enable the screen with no windowing and only BG1 visible
+    ; Put BG1 on the main screen
+    seta8
+    lda #1
+    sta.l TM
+    ;disable FBlank
+    lda #15 ; full brightness
+    sta.l INIDISP
     
     
 
