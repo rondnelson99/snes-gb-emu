@@ -15,6 +15,10 @@ COLOR_LIGHT_GRAY_OBP1 = RGB(20,20,0)
 COLOR_DARK_GRAY_OBP1 = RGB(10,10,0)
 COLOR_BLACK_OBP1 = RGB(0,0,0)
 
+; OAMDMA Location
+OAMDMA_ADDR = $FF94 ; this is used for a hack to avoid emualting RAM code
+
 ; CPU Emulation Optimizations
 CONFIG_LDD_CAN_WRITE_IO = 1
 CONFIG_LD_HL_A_CAN_WRITE_IO = 1
+CONFIG_SLA_R_CAN_SET_Z = 1

@@ -5,11 +5,18 @@
     .if I # 2 == 0 ; if even
         .redef opcode_table_byte, (I & $7f) | $80 
     .else
-        .redef opcode_table_byte, ((I + 32) & $7f) | $80 
+        .redef opcode_table_byte, ((I + 68) & $7f) | $80 
     .endif
+.elif I == $FF ; the last entry is special to avoid $fffe
+    .redef opcode_table_byte, $81
 .else
     .redef opcode_table_byte, (I  & $7f) | $80 
 .endif
+
+.if opcode_table_byte == $80 ; this is a hack to leave the first 257 bytes of the bank free for the jump table
+    .redef opcode_table_byte, $E9
+.endif
+
 .endm
 
 .macro GetOpcodeTableAddress ARGS lowbyte ; gets the address that will be jumped to for the given I/O index
@@ -35,8 +42,8 @@ PrefixJumpTable: ; contains a jump table rith relatively spaced-out entries
 /*.rept 256 INDEX opcode
     GetOpcodeTableAddress opcode
     .print HEX opcode_table_address, "\n"
-.endr
-*/
+.endr*/
+
 
 .SECTION "dispatch prefix opcode", BANK PREFIXBANK BASE $80 FREE 
 ; long jump to this to atart executing opcodes!
@@ -234,10 +241,21 @@ RR_A:
 GetOpcodeTableAddress opcode
 .SECTION "sla \@", BANK PREFIXBANK BASE $80 ORGA opcode_table_address FORCE
 SLA_R\@:
+.IF CONFIG_SLA_R_CAN_SET_Z == 1
     seta8
-    asl <reg
+    lda <reg
+    asl a
+    sta <reg
+    sta <GB_ZEROFLAG
     ror <GB_CARRYFLAG
     FinishPrefix
+.ELSE
+    seta8
+    asl <reg
+    sta <GB_ZEROFLAG
+    ror <GB_CARRYFLAG
+    FinishPrefix
+.ENDIF
 .ENDS
 .endm
 
@@ -524,5 +542,226 @@ bit_a $6F, 5
 bit_a $77, 6
 bit_a $7F, 7
 
+; set
 
+.macro set_r ARGS opcode, bit, reg
+GetOpcodeTableAddress opcode
+.SECTION "set {bit}, \@", BANK PREFIXBANK BASE $80 ORGA opcode_table_address FORCE
+SET_R\@:
+    seta8
+    lda #1 << bit
+    tsb <reg
+    FinishPrefix
+.ENDS
+.endm
+
+set_r $C0, 0, GB_BC + 1
+set_r $C1, 0, GB_BC
+set_r $C2, 0, GB_DE + 1
+set_r $C3, 0, GB_DE
+set_r $C4, 0, GB_HL + 1
+set_r $C5, 0, GB_HL
+
+set_r $C8, 1, GB_BC + 1
+set_r $C9, 1, GB_BC
+set_r $CA, 1, GB_DE + 1
+set_r $CB, 1, GB_DE
+set_r $CC, 1, GB_HL + 1
+set_r $CD, 1, GB_HL
+
+set_r $D0, 2, GB_BC + 1
+set_r $D1, 2, GB_BC
+set_r $D2, 2, GB_DE + 1
+set_r $D3, 2, GB_DE
+set_r $D4, 2, GB_HL + 1
+set_r $D5, 2, GB_HL
+
+set_r $D8, 3, GB_BC + 1
+set_r $D9, 3, GB_BC
+set_r $DA, 3, GB_DE + 1
+set_r $DB, 3, GB_DE
+set_r $DC, 3, GB_HL + 1
+set_r $DD, 3, GB_HL
+
+set_r $E0, 4, GB_BC + 1
+set_r $E1, 4, GB_BC
+set_r $E2, 4, GB_DE + 1
+set_r $E3, 4, GB_DE
+set_r $E4, 4, GB_HL + 1
+set_r $E5, 4, GB_HL
+
+set_r $E8, 5, GB_BC + 1
+set_r $E9, 5, GB_BC
+set_r $EA, 5, GB_DE + 1
+set_r $EB, 5, GB_DE
+set_r $EC, 5, GB_HL + 1
+set_r $ED, 5, GB_HL
+
+set_r $F0, 6, GB_BC + 1
+set_r $F1, 6, GB_BC
+set_r $F2, 6, GB_DE + 1
+set_r $F3, 6, GB_DE
+set_r $F4, 6, GB_HL + 1
+set_r $F5, 6, GB_HL
+
+set_r $F8, 7, GB_BC + 1
+set_r $F9, 7, GB_BC
+set_r $FA, 7, GB_DE + 1
+set_r $FB, 7, GB_DE
+set_r $FC, 7, GB_HL + 1
+set_r $FD, 7, GB_HL
+
+.macro set_hl ARGS opcode, bit
+GetOpcodeTableAddress opcode
+.SECTION "set {bit}, [hl]", BANK PREFIXBANK BASE $80 ORGA opcode_table_address FORCE
+SET_HL\@:
+    seta8
+    lda (<GB_HL)
+    ora #1 << bit
+    sta (<GB_HL)
+    FinishPrefix
+.ENDS
+.endm
+
+set_hl $C6, 0
+set_hl $CE, 1
+set_hl $D6, 2
+set_hl $DE, 3
+set_hl $E6, 4
+set_hl $EE, 5
+set_hl $F6, 6
+set_hl $FE, 7
+
+.macro set_a ARGS opcode, bit
+GetOpcodeTableAddress opcode
+.SECTION "set {bit}, a", BANK PREFIXBANK BASE $80 ORGA opcode_table_address FORCE
+SET_A\@:
+    seta8
+    tya
+    ora #1 << bit
+    tay
+    FinishPrefix
+.ENDS
+.endm
+
+set_a $C7, 0
+set_a $CF, 1
+set_a $D7, 2
+set_a $DF, 3
+set_a $E7, 4
+set_a $EF, 5
+set_a $F7, 6
+set_a $FF, 7
+
+; reset
+
+.macro res_r ARGS opcode, bit, reg
+GetOpcodeTableAddress opcode
+.SECTION "res {bit}, \@", BANK PREFIXBANK BASE $80 ORGA opcode_table_address FORCE
+RES_R\@:
+    seta8
+    lda #~(1 << bit)
+    and <reg
+    sta <reg
+    FinishPrefix
+.ENDS
+.endm
+
+res_r $80, 0, GB_BC + 1
+res_r $81, 0, GB_BC
+res_r $82, 0, GB_DE + 1
+res_r $83, 0, GB_DE
+res_r $84, 0, GB_HL + 1
+res_r $85, 0, GB_HL
+
+res_r $88, 1, GB_BC + 1
+res_r $89, 1, GB_BC
+res_r $8A, 1, GB_DE + 1
+res_r $8B, 1, GB_DE
+res_r $8C, 1, GB_HL + 1
+res_r $8D, 1, GB_HL
+
+res_r $90, 2, GB_BC + 1
+res_r $91, 2, GB_BC
+res_r $92, 2, GB_DE + 1
+res_r $93, 2, GB_DE
+res_r $94, 2, GB_HL + 1
+res_r $95, 2, GB_HL
+
+res_r $98, 3, GB_BC + 1
+res_r $99, 3, GB_BC
+res_r $9A, 3, GB_DE + 1
+res_r $9B, 3, GB_DE
+res_r $9C, 3, GB_HL + 1
+res_r $9D, 3, GB_HL
+
+res_r $A0, 4, GB_BC + 1
+res_r $A1, 4, GB_BC
+res_r $A2, 4, GB_DE + 1
+res_r $A3, 4, GB_DE
+res_r $A4, 4, GB_HL + 1
+res_r $A5, 4, GB_HL
+
+res_r $A8, 5, GB_BC + 1
+res_r $A9, 5, GB_BC
+res_r $AA, 5, GB_DE + 1
+res_r $AB, 5, GB_DE
+res_r $AC, 5, GB_HL + 1
+res_r $AD, 5, GB_HL
+
+res_r $B0, 6, GB_BC + 1
+res_r $B1, 6, GB_BC
+res_r $B2, 6, GB_DE + 1
+res_r $B3, 6, GB_DE
+res_r $B4, 6, GB_HL + 1
+res_r $B5, 6, GB_HL
+
+res_r $B8, 7, GB_BC + 1
+res_r $B9, 7, GB_BC
+res_r $BA, 7, GB_DE + 1
+res_r $BB, 7, GB_DE
+res_r $BC, 7, GB_HL + 1
+res_r $BD, 7, GB_HL
+
+.macro res_hl ARGS opcode, bit
+GetOpcodeTableAddress opcode
+.SECTION "res {bit}, [hl]", BANK PREFIXBANK BASE $80 ORGA opcode_table_address FORCE
+RES_HL\@:
+    seta8
+    lda (<GB_HL)
+    and #~(1 << bit)
+    sta (<GB_HL)
+    FinishPrefix
+.ENDS
+.endm
+
+res_hl $86, 0
+res_hl $8E, 1
+res_hl $96, 2
+res_hl $9E, 3
+res_hl $A6, 4
+res_hl $AE, 5
+res_hl $B6, 6
+res_hl $BE, 7
+
+.macro res_a ARGS opcode, bit
+GetOpcodeTableAddress opcode
+.SECTION "res {bit}, a", BANK PREFIXBANK BASE $80 ORGA opcode_table_address FORCE
+RES_A\@:
+    seta8
+    tya
+    and #~(1 << bit)
+    tay
+    FinishPrefix
+.ENDS
+.endm
+
+res_a $87, 0
+res_a $8F, 1
+res_a $97, 2
+res_a $9F, 3
+res_a $A7, 4
+res_a $AF, 5
+res_a $B7, 6
+res_a $BF, 7
 

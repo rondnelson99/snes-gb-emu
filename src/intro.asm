@@ -121,29 +121,7 @@ ResetFastROM:
     ; finally, start the DMA transfer
     lda #$01 ; Channel 0
     sta.w COPYSTART
-   /* ; set the DMA registers
-    ; source address
-    lda #BANK(GBImage)
-    sta.w DMAADDRBANK
-    ldx #GBImage
-    stx.w DMAADDR
-    ; dest address
-    lda #<WMDATA
-    sta.w DMAPPUREG
-    ldx #$8000
-    stx.w WMADDL
-    lda #$7F ; bank
-    sta.w WMADDH
-
-    ; length
-    ldx #GBImageEnd - GBImage
-    stx.w DMALEN
-    ; other properties
-    stz.w DMAMODE ; default properties
-
-    ; finally, start the DMA transfer
-    lda #$01 ; Channel 0
-    sta.w COPYSTART*/
+   
 
     ; Zero all of VRAM
     ; set the DMA registers
@@ -196,10 +174,7 @@ ResetFastROM:
     lda #$4300
     tad
     
-    ; set the VBLANK Flag and VBLANK counter
-    ldx #0
-    stx <FLAG_VBLANK
-    stx <VBLANK_COUNTER
+   
    
     
     ; enable the screen with no windowing and only BG1 visible
@@ -225,99 +200,39 @@ ResetFastROM:
     plb
 
     ; move the SP to start popping opcodes
-    lda #$8000 - 1
+    lda #$8100 - 1
     tcs
+
+    ; initialize the interrupt system
+    ; prep the first interrupt
+    setaxy8
+    lda #144
+    sta <NEXT_INTERRUPT_SCANLINE
+    sta <VBLANK_INTERRUPT_SCANLINE
+    stz <VBLANK_COUNTER
+    sta.l VTIMEL
+    lda #%00100000 ; scanline interrupt mode
+    sta.l NMITIMEN
+
+    lda #INTERRUPT_VBLANK
+    sta <NEXT_INTERRUPT_REASON
+
+    
 
     ; jump to the opcode handler!
     jmp.l StartDispatchOpcode
     
 
-/*    ; dispatch a BGP write
-    seta8
-    lda.l GB_MEMORY + $FF47 ; get the value in rBGP
-    tay
-    ldx #$47 ; prep the handler
-    jsl DispatchIOWrite
-
-    ; dispatch an OBP0 write
-    seta8
-    lda.l GB_MEMORY + $FF48 ; get the value in rOBP0
-    tay
-    ldx #$48 ; prep the handler
-    jsl DispatchIOWrite
-
-    ; dispatch an OBP1 write
-    lda.l GB_MEMORY + $FF49 ; get the value in rOBP1
-    tay
-    ldx #$49 ; prep the handler
-    jsl DispatchIOWrite
-
-
-
-    seta8
-    lda #5 << 3
-    sta.l BG1SC
-    lda #2
-    sta.l BG12NBA
-
-
-    ; Translate the OAM
-    ; put the 16-bit OAM address in Y
-    setaxy16
-    ldy #GB_OAM
-
-    ; move the directpage to the PPU I/O area
-    lda #$2100
-    tad
-    xba ; make sure the high byte is 0 for later
-    ; set the destination address in OAM to $0000
-    stz <OAMADDL
-    seta8
-TransferSprite:
-    ; transfer all 40 sprites in a loop
-    lda.w GB_MEMORY + 1, y ; grab the X position
-    sta <OAMDATA
-    lda.w GB_MEMORY + 0, y ; grab the Y position
-    sta <OAMDATA
-    lda.w GB_MEMORY + 2, y ; grab the tile number
-    lsr ; the bottom bit is handled using palettes
-    sta <OAMDATA
-    lda.w <GB_MEMORY + 3, y ; grab the attributes
-    ror ; discard the bottom bit but include the carry flag for the lookup
-    tax ; translate the attributes using a table
-    lda.l OAMTranslationTable, x
-    sta <OAMDATA
-    
-    ; increment the GB OAM pointer
-    iny
-    iny
-    iny
-    iny ; unfortunately, this seems to be our fastest option
-
-    ; check whether we're done
-    ; OAM is 160 bytes long
-    tya
-    cmp #160
-    bne TransferSprite
-*/
-
 Zero:
     .db 0
 
 
-
-
 .ENDS
 
-.SECTION "Gameboy image", BASE $80 SUPERFREE
-GBImage:
-    .INCBIN "res/gb.bin"
-GBImageEnd:
-.ENDS
 
 .SECTION "Gameboy ROM Image", BASE $80 BANK 0 ORGA $8000 FORCE
 GBRom:
-    .INCBIN "res/DMG_ROM.bin"
+    .INCBIN "res/bombgolf.gb"
 GBRomEnd:
 .ENDS
 

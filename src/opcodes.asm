@@ -52,6 +52,12 @@ StartDispatchOpcode:
 ; Begin opcode definitions
 ;--------------------------------------
 
+GetOpcodeTableAddress $00
+.SECTION "nop", BANK OPCODEBANK BASE $80 ORGA opcode_table_address FORCE
+NOP:
+    DispatchOpcode
+.ENDS
+
 ;--------------------------------------
 ; 8-bit loads
 ;--------------------------------------
@@ -446,14 +452,57 @@ LD_SP_HL:
     DispatchOpcode
 .ENDS
 
+GetOpcodeTableAddress $F8
+.SECTION "ld hl, sp+r8", BANK OPCODEBANK BASE $80 ORGA opcode_table_address FORCE
+LD_HL_SP_r8:
+    seta8
+    lda #$00
+    xba
+    pla
+    seta16
+    bpl @positive
+@negative
+    eor #$FF00 ; sign-extend
+@positive
+    clc
+    adc <GB_SP
+    sta <GB_HL
+    DispatchOpcode
+.ENDS
+    
+
+
 ;--------------------------------------
 ; stack ops
 
 GetOpcodeTableAddress $F5
 .SECTION "push af", BANK OPCODEBANK BASE $80 ORGA opcode_table_address FORCE
 PUSH_AF:
-    ; NOT IMPLEMENTED
+    seta8
+    tya
+    xba ; put the GB A into SNES B accumulator
+    ; now calculate F in the SNES A accumulator (daa flags not implemented)
+    lda #0
+    ; format is ZNHC0000
+    ldx <GB_CARRYFLAG ; copy carry to sign flag
+    bpl @carryClear
+    ora #%00010000
+@carryClear
+    ldx <GB_ZEROFLAG ; copy zero to zero flag
+    bne @zeroClear
+    ora #%10000000
+@zeroClear
+
+; now do the push
+    setaxy16
+    ldx <GB_SP
+    dex
+    dex
+    sta.w GB_MEMORY,x
+    stx <GB_SP
+    setaxy8
     DispatchOpcode
+
 .ENDS
 
 .macro push_rr ARGS opcode, regpair
@@ -479,7 +528,31 @@ push_rr $E5, GB_HL
 GetOpcodeTableAddress $F1
 .SECTION "pop af", BANK OPCODEBANK BASE $80 ORGA opcode_table_address FORCE
 POP_AF:
-    ; NOT IMPLEMENTED
+    ; start by doing the pop
+    setaxy16
+    ldx <GB_SP
+    lda.w GB_MEMORY,x
+    inx
+    inx
+    stx <GB_SP
+    setaxy8
+    ; now A accumulator contains GB F, B accumulator contains GB A
+    
+    ; now restore the GB flags
+    eor #$80 ; invert the zeroflag
+    stz <GB_ZEROFLAG
+    asl ; copy invested GB zero flag to SNES carry flag
+    ror <GB_ZEROFLAG
+
+    asl
+    asl
+    asl ; copy GB carry flag to SNES carry flag
+    ror <GB_CARRYFLAG
+
+    ; restore the GB accumulator
+    xba
+    tay
+
     DispatchOpcode
 .ENDS
 
@@ -1260,6 +1333,38 @@ dec_rr $1B, GB_DE
 dec_rr $2B, GB_HL
 dec_rr $3B, GB_SP
 
+.macro add_hl_rr ARGS opcode, regpair
+GetOpcodeTableAddress opcode
+.SECTION "add hl, rr\@", BANK OPCODEBANK BASE $80 ORGA opcode_table_address FORCE
+ADD_HL_RR\@:
+    seta16
+    lda <GB_HL
+    clc
+    adc <regpair
+    sta <GB_HL
+    ; these instructions don't set the zero flag, even on a real GB
+    ; they do set the carry flag, though
+    seta8
+    ror <GB_CARRYFLAG
+    DispatchOpcode
+.ENDS
+.endm
+
+add_hl_rr $09, GB_BC
+add_hl_rr $19, GB_DE
+add_hl_rr $39, GB_SP
+
+GetOpcodeTableAddress $29
+.SECTION "add hl, hl", BANK OPCODEBANK BASE $80 ORGA opcode_table_address FORCE
+ADD_HL_HL:
+    seta16
+    asl <GB_HL
+    seta8
+    ror <GB_CARRYFLAG
+    DispatchOpcode
+.ENDS
+
+
 
 ;--------------------------------------
 ; Control flow
@@ -1280,35 +1385,39 @@ JR_{condition}:
         lda.l OPVCT
         ; write the latch to rLY
         sta.w GB_MEMORY + $FF44
-
-        ; check if we've reached Vblank
-        cmp #144
-        bcc @notVblank
-
-        bit <FLAG_VBLANK ; check if this Vblank is already handled
-        bmi FinishJRNZ
-
-@handleVBlank
-    jmp.l HandleVBlank
-
-
-@notVblank
-    stz <FLAG_VBLANK ; clear the VBLANK flag
-
-FinishJRNZ:
         ; read the latch again to reset the flip-flop
         lda.l OPVCT
-        
+
+        ; and fake update rSTAT by simply incrementing the lower two bits
+        ldx.w GB_MEMORY + $FF41 ; read rSTAT
+        lda.l STATUpdateTable,x ; index the table with the current rSTAT value
+        sta.w GB_MEMORY + $FF41 ; write the new rSTAT value
 
         ldx <GB_ZEROFLAG
         beq @noJump
     .ELIF condition == "zero"
+
+        ; and fake update rSTAT by simply incrementing the lower two bits
+        ldx.w GB_MEMORY + $FF41 ; read rSTAT
+        lda.l STATUpdateTable,x ; index the table with the current rSTAT value
+        sta.w GB_MEMORY + $FF41 ; write the new rSTAT value
+
         ldx <GB_ZEROFLAG
         bne @noJump
     .ELIF condition == "noncarry"
         ldx <GB_CARRYFLAG
         bmi @noJump
     .ELIF condition == "carry"
+        seta8
+        lda.l SLHV
+        ; read the latch
+        lda.l OPVCT
+        ; write the latch to rLY
+        sta.w GB_MEMORY + $FF44
+        ; read the latch again to reset the flip-flop
+        lda.l OPVCT
+
+
         ldx <GB_CARRYFLAG
         bpl @noJump
     .ELIF condition == "always"
@@ -1330,16 +1439,31 @@ FinishJRNZ:
     adc #-1
     xba
     tcs
+
+    .IF condition == "nonzero" || condition == "carry"
+    ; check for interrupts by briefly enabling them
+    cli
+    sei
+    .ENDIF
+
     DispatchOpcode
 @branchForward
     ; if positive, only add the carry
     adc #0
     xba
     tcs
+
     DispatchOpcode
 
 @noJump
     plx ; discard the offset byte
+
+    .IF condition == "nonzero"
+    ; check for interrupts by briefly enabling them
+    cli
+    sei
+    .ENDIF
+
     DispatchOpcode
 .ENDS
 .endm
@@ -1349,6 +1473,14 @@ jr $28, "zero"
 jr $30, "noncarry"
 jr $38, "carry"
 jr $18, "always"
+
+.SECTION "STAT Update Table", SUPERFREE
+STATUpdateTable: ; index with the current STAT value to get the next one
+    .REPT 256 INDEX index
+        .db (index & $FC) | ((index + 1) & $03)
+    .ENDR
+.ENDS
+
 
 .macro jp ARGS opcode, condition
 GetOpcodeTableAddress opcode
@@ -1427,6 +1559,21 @@ CALL_{condition}:
     sta.w GB_MEMORY,x
     stx <GB_SP
     pla ; fetch the destination address
+
+    ; Check for OAMDMA
+.IF condition == "always"
+    cmp #OAMDMA_ADDR
+    bne @noOAMDMA
+    ; skip the DMA for now
+    ; fix the stack
+    inc <GB_SP
+    inc <GB_SP
+    setaxy8
+    DispatchOpcode
+@noOAMDMA
+.ENDIF
+    .accu 16
+    .index 16
     dec a ; step back since 65xx increments at the start of pull
     ora #$8000 ; read from the upper half
     tas
@@ -1445,6 +1592,34 @@ call $CC, "zero"
 call $D4, "noncarry"
 call $DC, "carry"
 call $CD, "always"
+
+.macro rst ARGS opcode, address
+GetOpcodeTableAddress opcode
+.SECTION "rst {address}", BANK OPCODEBANK BASE $80 ORGA opcode_table_address FORCE
+RST_{address}:
+    setaxy16
+    ; push the return address
+    tsa
+    ldx <GB_SP
+    dex
+    dex
+    sta.w GB_MEMORY,x
+    stx <GB_SP
+    lda # (address | $8000) - 1
+    tas
+    setaxy8
+    DispatchOpcode
+.ENDS
+.endm
+
+rst $C7, $00
+rst $CF, $08
+rst $D7, $10
+rst $DF, $18
+rst $E7, $20
+rst $EF, $28
+rst $F7, $30
+rst $FF, $38
 
 .macro ret ARGS opcode, condition
 GetOpcodeTableAddress opcode
@@ -1468,14 +1643,14 @@ RET_{condition}:
         .ERROR "Invalid condition for ret"
     .ENDIF
 @jump
-    setxy16
+    setaxy16
     ldx <GB_SP
     lda.w GB_MEMORY,x
     inx
     inx
     stx <GB_SP
     tas
-    setxy8
+    setaxy8
     DispatchOpcode
 
 @noJump
@@ -1488,6 +1663,50 @@ ret $C8, "zero"
 ret $D0, "noncarry"
 ret $D8, "carry"
 ret $C9, "always"
+
+GetOpcodeTableAddress $D9
+.SECTION "reti", BANK OPCODEBANK BASE $80 ORGA opcode_table_address FORCE
+RETI:
+    stx <GB_IME
+
+    setaxy16
+    ldx <GB_SP
+    lda.w GB_MEMORY,x
+    inx
+    inx
+    stx <GB_SP
+    tas
+    setaxy8
+    DispatchOpcode
+.ENDS
+
+
+
+;--------------------------------------
+; interrupts
+
+GetOpcodeTableAddress $F3
+.SECTION "di", BANK OPCODEBANK BASE $80 ORGA opcode_table_address FORCE
+DI:
+    seta8
+    stz <GB_IME
+    DispatchOpcode
+.ENDS
+
+GetOpcodeTableAddress $FB
+.SECTION "ei", BANK OPCODEBANK BASE $80 ORGA opcode_table_address FORCE
+EI:
+    stx <GB_IME
+    DispatchOpcode
+.ENDS
+
+GetOpcodeTableAddress $76
+.SECTION "halt", BANK OPCODEBANK BASE $80 ORGA opcode_table_address FORCE
+HALT:
+    cli
+    wai
+    DispatchOpcode
+.ENDS
 
 
 

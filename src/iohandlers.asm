@@ -53,6 +53,122 @@ skipIORegister\@:
     skipIORegister soundreg + $10
 .endr
 
+;P1
+GetIOTableAddress $00 ; P1
+.SECTION "P1 Handler", BANK IOHANDLERBANK BASE $80 ORGA io_table_address FORCE
+P1Handler:
+; Not Implemented: just set all buttons to 1 (not pressed)
+    ldx #%1111
+    stx.w GB_MEMORY + $FF00
+    returnFromIOHandler
+.ENDS
+
+GetIOTableAddress $0F ; Interrupt Flags
+.SECTION "IF Handler", BANK IOHANDLERBANK BASE $80 ORGA io_table_address FORCE
+IFHandler:
+    returnFromIOHandler
+.ENDS
+
+; Window Registers
+GetIOTableAddress $4A ; WY
+.SECTION "WY Handler", BANK IOHANDLERBANK BASE $80 ORGA io_table_address FORCE
+WYHandler:
+    returnFromIOHandler
+.ENDS
+
+GetIOTableAddress $4B ; WX
+.SECTION "WX Handler", BANK IOHANDLERBANK BASE $80 ORGA io_table_address FORCE
+WXHandler:
+    returnFromIOHandler
+.ENDS
+
+GetIOTableAddress $45 ; LYC
+.SECTION "LYC Handler", BANK IOHANDLERBANK BASE $80 ORGA io_table_address FORCE
+LYCHandler:
+    seta8
+    tya ; write the value to the emulated memory
+    sta.w GB_MEMORY + $FF45
+
+    ; update the next interrupt
+
+    ; TODO: Update the current scanline
+
+        ; set a high interrupt distance so it gets overwritten by anything
+    lda #255
+    sta <Scratchpad
+    ; if IME=0 then there won't be any GB interrupts
+    ldx <GB_IME
+    beq @NoGBInterrupts
+    ; we calculate the scanline for the next interrupt of each type, and remember the soonest one
+
+    ; test the GB interrupts
+
+    ; timer/joypad/serial are not implemented and VBlank is handled separately, so we jsut test for STAT
+
+    ; for now, STAT only includes LYC
+
+    ; check if the STAT interrupt is enabled
+    lda.w GB_MEMORY + $ffff ; rIE
+    and #%00000010
+    beq @NoSTATInterrupt
+
+    ; basically now there are 2 possibilities:
+    ; No STAT interrupt, LYC interrupt (other sources not implemented)
+    lda.w GB_MEMORY + $ff41 ; rSTAT
+
+    ; check if we're using LYC
+    bit #%01000000
+    beq @NoSTATInterrupt
+
+    ; subtract the scanline this interrupt fired on from LYC
+    lda.w GB_MEMORY + $ff45 ; rLYC    
+    sec
+    sbc <NEXT_INTERRUPT_SCANLINE ; this is the current interrupt scanline since we haven't read it yet
+    beq @NoSTATInterrupt ; if we're already on this scanline, thenm this shouldn't trigger until next frame
+    sta <Scratchpad
+    ; now SPad holds the number of scanlines until the next LYC interrupt
+    ldy #INTERRUPT_LCDSTAT ; keep the winning interrupt type in Y
+
+@NoSTATInterrupt
+@NoGBInterrupts
+
+    ; Check for the Vblank start/end interrupts
+    
+    lda <VBLANK_INTERRUPT_SCANLINE
+    sec
+    sbc <NEXT_INTERRUPT_SCANLINE
+    cmp <Scratchpad 
+    bcs @notVblank
+
+    ; if VBlank starts sooner:
+    sta <Scratchpad ; get the new scanline difference and interupt flag
+    ldy #INTERRUPT_VBLANK
+
+@notVblank
+
+    ; now we have our interrupt scanline difference and type
+    ; add the old interrupt scanline to get the next scanline
+
+    lda <Scratchpad
+    clc
+    adc <NEXT_INTERRUPT_SCANLINE
+    sta <NEXT_INTERRUPT_SCANLINE
+    ; store the line in the SNES line interrupt reg
+    sta.l VTIMEL
+    ; store the interrupt type
+    sty <NEXT_INTERRUPT_REASON
+
+
+    returnFromIOHandler
+.ENDS
+
+;STAT
+GetIOTableAddress $41 ; STAT
+.SECTION "STAT Handler", BANK IOHANDLERBANK BASE $80 ORGA io_table_address FORCE
+STATHandler:
+    sty.w GB_MEMORY + $FF41
+    returnFromIOHandler
+.ENDS
 
 GetIOTableAddress $40 ; LCDC: The hard one
 .SECTION "LCDC Handler", BANK IOHANDLERBANK BASE $80 ORGA io_table_address FORCE
@@ -71,6 +187,10 @@ LCDCHandler:
 
     seta8
     tya
+
+    ; store it in the GB memory
+    sta.w GB_MEMORY + $FF40
+
     ldx # (VRAM_BG_TILEMAP_1 >> 10) << 2
     bit #%00001000 ; BG tile map
     beq @BGTilemap1
@@ -129,6 +249,9 @@ GetIOTableAddress $47 ; BGP
 .SECTION "BGP Handler", BANK IOHANDLERBANK BASE $80 ORGA io_table_address FORCE
 BGPHandler:
 .index 8
+    ; save the accumulator
+    sty <GB_A
+
     seta16
     ; move the direct page to the PPU registers (which has the CGRAM port in it)
     lda #$2100
@@ -181,10 +304,14 @@ BGPHandler:
     sta <CGDATA
     lda.l PaletteEntriesHigh, x
     sta <CGDATA
+    
     ; fix the direct page
     seta16
     lda #$4300 ; back to the DMA registers
     tad
+    
+    ; restore the accumulator
+    ldy <GB_A
     returnFromIOHandler
 .ENDS
 
@@ -206,6 +333,10 @@ PaletteEntriesHigh:
 .MACRO HandleOBP ARGS TableAddress CGIndex 
     ; this is similar to the BGP handler, but his time we generate the colors ahead of time,
 ; and then make more complex arrangements of them
+
+    ; save the accumulator
+    sty <GB_A
+
     setaxy16
     .8BIT
     
@@ -328,6 +459,8 @@ PaletteEntriesHigh:
     ; return the direct page to the DMA registers
     lda #$4300
     tad
+    ; restore the accumulator
+    ldy <GB_A
     returnFromIOHandler
 .ENDM
 

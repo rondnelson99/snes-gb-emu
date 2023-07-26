@@ -2,7 +2,7 @@
 obj/dmaregisters.o
 obj/vram.o
 obj/gbmemory.o
-obj/vblank.o
+obj/interrupts.o
 obj/iohandlers.o
 obj/opcodes.o
 obj/cbprefix.o
