@@ -57,11 +57,56 @@ skipIORegister\@:
 GetIOTableAddress $00 ; P1
 .SECTION "P1 Handler", BANK IOHANDLERBANK BASE $80 ORGA io_table_address FORCE
 P1Handler:
-; Not Implemented: just set all buttons to 1 (not pressed)
-    ldx #%1111
-    stx.w GB_MEMORY + $FF00
+    ; bit 4 means reading dpad, bit 5 means reading buttons
+    seta8
+    tya
+    and #%00010000
+    bne @ReadButtons ; 0=select
+@ReadDPad
+    lda.l JOY1H ; lower 4 bits are up, down, left, right
+    ; we want down, up, left, right instead
+    ; use a table to convert
+    and #%00001111
+    tax
+    lda.l DPADP1Table, x
+    sta.w GB_MEMORY + $FF00
+    returnFromIOHandler
+@ReadButtons
+    ; we want start, select, b, a
+    ; use bitshifts to arrange this
+    lda #%0010 ; the top 4 bits
+    sta.w GB_MEMORY + $FF00
+    lda.l JOY1H ; the TOP 4 bits are b, y, select, start
+    eor #$ff ; invert because SNES is active high
+    lsr
+    lsr
+    lsr
+    lsr
+    
+    lsr ; Start
+    rol.w GB_MEMORY + $FF00
+    lsr ; Select
+    rol.w GB_MEMORY + $FF00
+    lsr
+    lsr ; B
+    rol.w GB_MEMORY + $FF00
+
+    lda.l JOY1L ; the TOP bit is A
+    eor #$ff ; invert because SNES is active high
+    asl
+    rol.w GB_MEMORY + $FF00
     returnFromIOHandler
 .ENDS
+
+.SECTION "DPAD P1 Table", BASE $80 SUPERFREE
+    ; index this table with JOY1H & $0f, get the rP1 value for the dpad
+DPADP1Table:
+    .rept 16 INDEX index
+        .db ((index & %11) | ((index >> 1) & %100) | ((index << 1) & %1000)) ~ $0f | %10000
+    .endr
+.ENDS
+    
+
 
 GetIOTableAddress $0F ; Interrupt Flags
 .SECTION "IF Handler", BANK IOHANDLERBANK BASE $80 ORGA io_table_address FORCE

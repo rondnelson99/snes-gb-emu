@@ -185,6 +185,9 @@ ResetFastROM:
     ;disable FBlank
     lda #15 ; full brightness
     sta.l INIDISP
+    ; initialize the joypad
+    ;lda #0
+    ;sta.l $4016 ; JOYWR
     
     
 
@@ -211,7 +214,7 @@ ResetFastROM:
     sta <VBLANK_INTERRUPT_SCANLINE
     stz <VBLANK_COUNTER
     sta.l VTIMEL
-    lda #%00100000 ; scanline interrupt mode
+    lda #%00100001 ; scanline interrupt mode + auto joypad read
     sta.l NMITIMEN
 
     lda #INTERRUPT_VBLANK

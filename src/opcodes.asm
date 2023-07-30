@@ -302,7 +302,7 @@ LD_A_D16:
 
 GetOpcodeTableAddress $E2
 .SECTION "ld (c), a", BANK OPCODEBANK BASE $80 ORGA opcode_table_address FORCE
-LD_C_A: ; NOT IMPLEMENTED
+LD_C_A: 
     ldx <GB_BC ; sets the n flag if this is in the IO range
     bmi @notIo
 @isIo
@@ -316,7 +316,9 @@ LD_C_A: ; NOT IMPLEMENTED
 
 GetOpcodeTableAddress $F2
 .SECTION "ld a, (c)", BANK OPCODEBANK BASE $80 ORGA opcode_table_address FORCE
-LD_A_C: ; NOT IMPLEMENTED
+LD_A_C: 
+    ldx <GB_BC
+    ldy.w GB_IO,x
     DispatchOpcode
 .ENDS
 
@@ -636,6 +638,7 @@ ADD_A_d8:
     tya
     adc 1,s ; add the top of the stack
     sta <GB_ZEROFLAG
+    tay
     ror <GB_CARRYFLAG
     plx ; discard the d8
     DispatchOpcode
@@ -696,6 +699,7 @@ ADC_A_d8:
     rol <GB_CARRYFLAG
     adc 1,s ; add the top of the stack
     sta <GB_ZEROFLAG
+    tay
     ror <GB_CARRYFLAG
     plx ; discard the d8
     DispatchOpcode
@@ -770,7 +774,7 @@ SUB_A_D8:
     sbc 1,s ; add the top of the stack
     sta <GB_ZEROFLAG
     tay
-    plx ; discard the d8
+    pla ; discard the d8
     ; now we invert the carry flag before storing it
     bcc @setCarry
 @clearCarry
@@ -861,7 +865,7 @@ SBC_A_D8:
     sbc 1,s ; sbc the top of the stack
     sta <GB_ZEROFLAG
     tay
-    plx ; discard the d8
+    pla ; discard the d8
     ; now we invert the carry flag before storing it
     bcc @setCarry
 @clearCarry
@@ -1093,7 +1097,7 @@ CP_A_D8:
     tya
     sbc 1,s ; sbc the top of the stack
     sta <GB_ZEROFLAG
-    plx ; discard the d8
+    pla ; discard the d8
     ; now we invert the carry flag before storing it
     bcc @setCarry
 @clearCarry
