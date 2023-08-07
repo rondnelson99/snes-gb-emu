@@ -797,6 +797,7 @@ SBC_A_R\@:
     lda <GB_CARRYFLAG
     eor #$FF
     rol a
+    tya
     sbc <reg
     sta <GB_ZEROFLAG
     tay
@@ -827,6 +828,7 @@ SBC_A_HL:
     lda <GB_CARRYFLAG
     eor #$FF
     rol a
+    tya
     .db $F2 ; sbc (dp)
     .db <GB_HL ; gets around a stupid WLA-DX issue
     sta <GB_ZEROFLAG
@@ -864,6 +866,7 @@ SBC_A_D8:
     lda <GB_CARRYFLAG
     eor #$FF
     rol a
+    tya
     sbc 1,s ; sbc the top of the stack
     sta <GB_ZEROFLAG
     tay
