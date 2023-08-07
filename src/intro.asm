@@ -178,9 +178,9 @@ ResetFastROM:
    
     
     ; enable the screen with no windowing and only BG1 visible
-    ; Put BG1 on the main screen
+    ; Put BG1 + OBJ on the main screen
     seta8
-    lda #1
+    lda #%10001
     sta.l TM
     ;disable FBlank
     lda #15 ; full brightness
@@ -239,35 +239,4 @@ GBRom:
 GBRomEnd:
 .ENDS
 
-.SECTION "OAM Flag Translation Table", BASE $80 SUPERFREE
-/*
-On GB, these are the meanings of the bits in the OAM attributes byte:
-7: Priotity (0=above BG, 1=behind BG)
-6: Y flip
-5: X flip
-4: Palette (0=OBP0, 1=OBP1)
-0-3: usused on DMG
-we rotate them right by 1 bit with bit 0 of the tile number at the top, which should get translated to bit 0 of the sprite palette
 
-On SNES, these are the meanings of the bits in the OAM attributes byte:
-7: Y flip
-6: X flip
-4-5: priority (TODO: research this)
-1-3: palette (0-7)
-0: upper bit of tile number (unused)
-
-The mapping is as follows:
-GB 7(tile) -> SNES 1
-GB 6(7) -> SNES 4 (for now)
-GB 5(6) -> SNES 7
-GB 4(5) -> SNES 6
-GB 3(4) -> SNES 2
-
-SNES bits 0, 3, and 5 are always 0
-*/
-OAMTranslationTable:
-    .REPT 256 INDEX I
-        .db (I & $80) >> 6 | (I & $40) >> 2 | (I & $20) << 2 | (I & $10) << 2 | (I & $08) >> 1
-    .ENDR
-.ENDS
-        

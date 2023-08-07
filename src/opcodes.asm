@@ -626,6 +626,7 @@ ADD_A_A:
     seta8
     tya
     asl a
+    tay
     ror <GB_CARRYFLAG
     DispatchOpcode
 .ENDS
@@ -687,6 +688,7 @@ ADC_A_A:
     tya
     rol <GB_CARRYFLAG
     rol a
+    tay
     ror <GB_CARRYFLAG
     DispatchOpcode
 .ENDS
@@ -1085,7 +1087,8 @@ GetOpcodeTableAddress $BF
 .SECTION "cp a, a", BANK OPCODEBANK BASE $80 ORGA opcode_table_address FORCE
 CP_A_A:
     ; all this does is set the zero flag
-    sty <GB_ZEROFLAG
+    seta8
+    stz <GB_ZEROFLAG
     DispatchOpcode
 .ENDS
 
@@ -1568,12 +1571,13 @@ CALL_{condition}:
 .IF condition == "always"
     cmp #OAMDMA_ADDR
     bne @noOAMDMA
-    ; skip the DMA for now
     ; fix the stack
     inc <GB_SP
     inc <GB_SP
-    setaxy8
-    DispatchOpcode
+    
+    ; translate the shadow OAM
+    jmp.l TranslateOAM
+
 @noOAMDMA
 .ENDIF
     .accu 16

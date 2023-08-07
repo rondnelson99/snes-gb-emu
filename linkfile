@@ -7,4 +7,4 @@ obj/iohandlers.o
 obj/opcodes.o
 obj/cbprefix.o
 obj/intro.o
-
+obj/oam.o

@@ -17,6 +17,7 @@ COLOR_BLACK_OBP1 = RGB(0,0,0)
 
 ; OAMDMA Location
 OAMDMA_ADDR = $FF94 ; this is used for a hack to avoid emualting RAM code
+SHADOWOAM_ADDR = $C000 ; this is the location of the shadow OAM that gets DMA'd
 
 ; CPU Emulation Optimizations
 CONFIG_LDD_CAN_WRITE_IO = 1
