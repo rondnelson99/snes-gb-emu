@@ -14,6 +14,8 @@ COLOR_WHITE_OBP1 = RGB(31,31,0)
 COLOR_LIGHT_GRAY_OBP1 = RGB(20,20,0)
 COLOR_DARK_GRAY_OBP1 = RGB(10,10,0)
 COLOR_BLACK_OBP1 = RGB(0,0,0)
+; Object transparency doesn't always work, so define a "transparent" color which should camouflage with the background
+COLOR_TRANSPARENT = COLOR_LIGHT_GRAY
 
 ; OAMDMA Location
 OAMDMA_ADDR = $FF94 ; this is used for a hack to avoid emualting RAM code

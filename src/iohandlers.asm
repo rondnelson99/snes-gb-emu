@@ -391,12 +391,10 @@ PaletteEntriesHigh:
     ; so we can move the direct page and still have faster access to them
 
 
-    ; color 0
-    tya ; get the palette entry
-    asl ; double for the word-sized table
-    and #%110 ; mask down to just the color index
-    tax ; use it as an index
-    lda.l TableAddress, x ; get the palette entry
+    ; color 0 is ignored on GB - it's transparent
+    ; unfortunately transparency only works if the ajdacent tile in VRAM is also transparent
+    ; here we get a backup colow to use instead
+    lda #COLOR_TRANSPARENT
     sta.w EchoScratchpad ; store it
 
     ; color 1
