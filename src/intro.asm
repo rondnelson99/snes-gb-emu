@@ -175,13 +175,20 @@ ResetFastROM:
     tad
     
    
-   
     
     ; enable the screen with no windowing and only BG1 visible
     ; Put BG1 + OBJ on the main screen
     seta8
     lda #%10001
     sta.l TM
+    
+    ; set the window 1 right position to 144
+    lda #144
+    sta.l WH1
+    ; Enable windowing for BG1 and BG2
+    lda #%00000011
+    sta.l TMW
+    
     ;disable FBlank
     lda #15 ; full brightness
     sta.l INIDISP

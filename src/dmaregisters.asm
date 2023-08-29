@@ -7,10 +7,12 @@
 DMA_UNUSABLE_0: ds 16 ; this is the whole channel
 .ENDS
 
-; the other channels only have the ususable bytes reserved
-.RAMSECTION "DMA Unusable 1" SLOT "DMA" ORGA $431C FORCE
-DMA_UNUSABLE_1: ds 4
+; DMA 1 is used for HDMA for the Window
+.RAMSECTION "DMA Unusable 1" SLOT "DMA" ORGA $4310 FORCE
+DMA_UNUSABLE_1: ds 16 ; this is the whole channel
 .ENDS
+
+; the other channels only have the ususable bytes reserved
 
 .RAMSECTION "DMA Unusable 2" SLOT "DMA" ORGA $432C FORCE
 DMA_UNUSABLE_2: ds 4

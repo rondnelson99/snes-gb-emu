@@ -102,8 +102,14 @@ LongIRQHandler:
     ldx <VBLANK_INTERRUPT_SCANLINE
     beq @VBlankEnd
 
+    ; This is a VBlank start:
+
     ; change the Vblank interrupt scanline to 0
     stz <VBLANK_INTERRUPT_SCANLINE
+
+    /* ; Start the WY HDMA
+    lda #%10 ; HDMA Channel 1
+    sta.l HDMAEN*/
 
     ; call an appropriate DMA routine using a jump table
     ldx <VBLANK_COUNTER

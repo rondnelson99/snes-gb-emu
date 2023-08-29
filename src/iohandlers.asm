@@ -118,12 +118,44 @@ IFHandler:
 GetIOTableAddress $4A ; WY
 .SECTION "WY Handler", BANK IOHANDLERBANK BASE $80 ORGA io_table_address FORCE
 WYHandler:
+    ; The implementation of WY is somewhat complicated. 
+    ; It controls an HDMA Table which Contols the Window enable on BG1 (BG) and BG2 (Window)
+    ; If WY != 0, then then the HDMA table is enabled. At first, we set BG0 fully windowed in and BG1 fully windowed out
+    ; then we wait a number of lines controlled by WY and set up the Window according to WH0 set by WX
+    tya
+    beq @WYZero
+    ; WY != 0
+    ; NOT IMPLEMENTED
+    brk $0
+@WYZero
+    ; WY == 0
+    ; Check if Window is acutally enabled
+    lda.w GB_MEMORY + $FF40 ; rLCDC
+    bit #%00100000 ; window enable bit
+    beq @done ; if it's not enabled, then we're done
+    ; now we don't use the HDMA Table and simply configure the window directly
+    lda.l W12SELatWY ; get the W12SEL value used by the window
+    sta.l W12SEL ; Window 1 enable
+    lda #$80
+    sta.l WYHDMATable
+@done    
     returnFromIOHandler
+.ENDS
+
+.RAMSECTION "WY table and variables" SLOT "LORAM"
+WYHDMATable: ds 10 ; 10 bytes of HDMA table
+W12SELLine0: ds 1 ; The value to write to W12SEL at the start of the frame
+W12SELatWY: ds 1 ; The value written by the HDMA Table when WY is reached. Changes based on Winodow enable
 .ENDS
 
 GetIOTableAddress $4B ; WX
 .SECTION "WX Handler", BANK IOHANDLERBANK BASE $80 ORGA io_table_address FORCE
 WXHandler:
+    ; The GB Window is Window 1 on the SNES. Therefore WX is the left edge of the SNES window
+    tya
+    sec
+    sbc #7 ; subtract 7 to get the left edge
+    sta.l WH0 ; Window 1 left edge
     returnFromIOHandler
 .ENDS
 
@@ -228,7 +260,7 @@ LCDCHandler:
     ; 1: OBJ enable
     ; 0: BG & Window enable
 
-    ; for now, we'll only implement bits 3 and 4
+    ; for now, we'll only implement bits 3, 4, 5
 
     seta8
     tya
@@ -236,6 +268,7 @@ LCDCHandler:
     ; store it in the GB memory
     sta.w GB_MEMORY + $FF40
 
+; Bit 3: BG tile map location
     ldx # (VRAM_BG_TILEMAP_1 >> 10) << 2
     bit #%00001000 ; BG tile map
     beq @BGTilemap1
@@ -246,16 +279,63 @@ LCDCHandler:
     txa
     sta.l BG1SC
 
+; Bit 6: Window tile map location
+    ldx # (VRAM_BG_TILEMAP_1 >> 10) << 2
+    bit #%01000000 ; Window tile map
+    beq @WindowTilemap1
+@WindowTilemap2
+    ldx # (VRAM_BG_TILEMAP_2 >> 10) << 2
+@WindowTilemap1
+    ; store the tilemap address
+    txa
+    sta.l BG2SC
+
+; Bit 4: BG/Window tile data location
     tya
-    ldx # VRAM_BG_TILES >> 12
+    ldx # (VRAM_BG_TILES >> 12) | (VRAM_BG_TILES >> 8)
     bit #%00010000 ; BG tile data
     beq @BGTiles
 @BGSharedTiles
-    ldx # VRAM_SPRITE_TILES >> 12
+    ldx # (VRAM_SPRITE_TILES >> 12) | (VRAM_SPRITE_TILES >> 8)
 @BGTiles
     ; store the tile data address
     txa
     sta.l BG12NBA
+
+; Bit 5: Window enable
+    ; The HDMA Table that controls WY always runs, regardless of whether Window is enabled.
+    ; That way, it can be enabled mid-frame
+    ; This bit controls whether it writes a dummy value of zero to W12SEL or the actual value
+    tya
+    bit #%00100000 ; Window enable
+    beq @WindowDisabled
+    ; Window enabled
+    ; Enable BG2 through TM
+    lda #%10011 ; enable OBJ + BG1 and BG2
+    sta.l TM ; write it to the TM register
+
+     lda #%00110010 ; Use W1 for BG1 and BG2, invert it for BG2
+
+    ; The other thing we need to do is check if we're past WY and enable it RIGHT NOW if we are
+    ; Grab rLY for speed rather than reading from SNES registers
+    ldx.w GB_MEMORY + $FF45 ; rLY
+    ; check if we're past WY
+    cpx.w GB_MEMORY + $FF4A ; rWY
+    bcs @GotW12SEL
+
+    sta.l W12SEL
+    bra @GotW12SEL
+
+@WindowDisabled
+    ; disable BG2 through TM
+    lda #%10001 ; enable OBJ + BG1 only
+    sta.l TM ; write it to the TM register
+
+    lda #0
+    ; fall through
+@GotW12SEL
+    sta.l W12SELatWY ; store the value used by the HDMA Table
+
 
     returnFromIOHandler
 .ENDS
